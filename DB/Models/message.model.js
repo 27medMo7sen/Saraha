@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose'
+import mongoose, { Schema } from "mongoose";
 
 const msgSchema = new Schema(
   {
@@ -9,12 +9,16 @@ const msgSchema = new Schema(
     },
     sendTo: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
+    },
+    sentBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   {
     timestamps: true,
-  },
-)
+  }
+);
 
-export const msgModel = mongoose.model('Message', msgSchema)
+export const msgModel = mongoose.model("Message", msgSchema);

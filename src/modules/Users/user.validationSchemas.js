@@ -1,5 +1,5 @@
-import joi from 'joi'
-import { generalFields } from '../../middlewares/validation.js'
+import joi from "joi";
+import { generalFields } from "../../middlewares/validation.js";
 
 export const SignUpSchema = {
   body: joi
@@ -7,23 +7,19 @@ export const SignUpSchema = {
       username: joi
         .string()
         .min(3)
-        .max(10)
+        .max(20)
         .messages({
-          'any.required': 'userName is required',
+          "any.required": "userName is required",
         })
         .required(),
       email: generalFields.email,
       password: generalFields.password,
-      cPassword: joi.valid(joi.ref('password')).required(),
+      cPassword: joi.valid(joi.ref("password")).required(),
       gender: joi.string().optional(),
+      age: joi.number().min(18).max(100).optional(),
     })
     .required(),
-  //   query: joi
-  //     .object({
-  //       test: joi.string().min(3).max(5).required(),
-  //     })
-  //     .required(),
-}
+};
 
 export const SignInSchema = {
   body: joi
@@ -31,6 +27,6 @@ export const SignInSchema = {
       email: generalFields.email,
       password: generalFields.password,
     })
-    .options({ presence: 'required' })
+    .options({ presence: "required" })
     .required(),
-}
+};

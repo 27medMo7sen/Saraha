@@ -1,43 +1,56 @@
-import { msgModel } from '../../../DB/Models/message.model.js'
-import { userModel } from '../../../DB/Models/user.model.js'
+import { msgModel } from "../../../DB/Models/message.model.js";
+import { userModel } from "../../../DB/Models/user.model.js";
 
-//============================== send message =====================
+//MARK:SEND MESSAGE
 export const sendMessage = async (req, res, next) => {
-  const { content, sendTo } = req.body
+  const { _id } = req.authUser;
+  const { content, sendTo } = req.body;
 
-  const isUserExists = await userModel.findById(sendTo)
+  const isUserExists = await userModel.findById(sendTo);
   if (!isUserExists) {
-    // return res.status(400).json({ message: 'invalid account' })
-    return next(new Error('invalid account', { cause: 400 }))
+    return next(new Error("invalid account", { cause: 400 }));
   }
 
-  const message = new msgModel({ content, sendTo })
-  await message.save()
-  res.status(201).json({ message: 'Done' })
-}
-
-//=============================== get user messages ===================
+  const message = new msgModel({ content, sendTo, sentBy: _id });
+  await message.save();
+  res.status(201).json({ message: "Done", message });
+};
+//MARK:GET MESSAGES
 export const getUserMessages = async (req, res, next) => {
-  const { _id } = req.authUser
-  const messages = await msgModel.find({ sendTo: _id })
+  const { _id } = req.authUser;
+  const messages = await msgModel.find({ sendTo: _id });
   if (messages.length) {
-    return res.status(200).json({ message: 'Done', messages })
+    return res.status(200).json({ message: "Done", messages });
   }
-  res.status(200).json({ message: 'empty inbox' })
-}
-
-//================================ delete message ===================
+  res.status(200).json({ message: "empty inbox" });
+};
+//MARK:DELETE MESSAGE
 export const deleteMessages = async (req, res, next) => {
-  const { _id } = req.authUser
-  const { msgId } = req.params
+  const { _id } = req.authUser;
+  const { msgId } = req.params;
   const message = await msgModel.findOneAndDelete({
     _id: msgId,
     sendTo: _id,
-  })
+  });
 
   if (message) {
-    return res.status(200).json({ message: 'Done' })
+    return res.status(200).json({ message: "Done" });
   }
-  // res.status(401).json({ message: 'Unauthorized to delete this message' })
-  return next(new Error('Unauthorized to delete this message', { cause: 400 }))
-}
+  return next(new Error("Unauthorized to delete this message", { cause: 400 }));
+};
+//MARK:UPDATE MESSAGE
+export const updateMessage = async (req, res, next) => {
+  const { _id } = req.authUser;
+  const { msgId } = req.params;
+  const { content } = req.body;
+  const message = await msgModel.findOneAndUpdate(
+    { _id: msgId, sentBy: _id },
+    { content },
+    { new: true }
+  );
+
+  if (message) {
+    return res.status(200).json({ message: "Done", message });
+  }
+  return next(new Error("Unauthorized to update this message", { cause: 400 }));
+};

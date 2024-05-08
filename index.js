@@ -13,6 +13,7 @@ import * as allRouter from "./src/modules/index.routes.js";
 app.use(express.json());
 connectionDB();
 
+app.get("/", (req, res) => res.send("Hello World!"));
 app.use("/uploads", express.static("./uploads"));
 
 app.use("/user", allRouter.userRouter);
@@ -27,5 +28,4 @@ app.use((err, req, res, next) => {
     return res.status(err["cause"] || 500).json({ message: err.message });
   }
 });
-app.get("/", (req, res) => res.send("Hello World!"));
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));

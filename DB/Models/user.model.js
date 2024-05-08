@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose'
+import mongoose, { Schema } from "mongoose";
 
 const userSchema = new Schema(
   {
@@ -18,8 +18,8 @@ const userSchema = new Schema(
     },
     gender: {
       type: String,
-      enum: ['female', 'male', 'not specified'],
-      default: 'not specified',
+      enum: ["female", "male", "not specified"],
+      default: "not specified",
     },
     profile_pic: {
       secure_url: String,
@@ -35,13 +35,21 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    age: {
+      type: Number,
+      min: 18,
+      max: 100,
+    },
+    QrCode: {
+      type: String,
+    },
     token: {
       type: String,
     },
   },
   {
     timestamps: true,
-  },
-)
+  }
+);
 
-export const userModel = mongoose.model('User', userSchema)
+export const userModel = mongoose.model("User", userSchema);

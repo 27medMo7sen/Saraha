@@ -18,7 +18,7 @@ router.get("/:_id", asyncHandler(uc.getUser));
 router.post(
   "/profile",
   isAuth(),
-  multerCloudFunction(allowedExtensions.Image).single("profile"), // req.file
+  multerCloudFunction(allowedExtensions.Image).single("profile"), 
   asyncHandler(uc.profilePicture)
 );
 
