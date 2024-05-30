@@ -1,15 +1,29 @@
 import { userModel } from "../../../DB/Models/user.model.js";
 import bcrypt from "bcrypt";
 import { asyncHandler } from "../../utils/errorhandling.js";
-
+import { customAlphabet } from "nanoid";
+const nanoid = customAlphabet("123456_=!ascbhdtel", 5);
 import { sendEmailService } from "../../services/sendEmailService.js";
 import cloudinary from "../../utils/coludinaryConfigrations.js";
 import { generateQrCode } from "../../utils/qrCodeFunction.js";
 import { generateToken, verifyToken } from "../../utils/tokenFunctions.js";
+import { emailTemplate } from "../../utils/emailTemplate.js";
 
 //MARK:SIGNUP
 export const SignUp = async (req, res, next) => {
-  const { username, email, password, gender } = req.body;
+  const {
+    firstname,
+    lastname,
+    username,
+    email,
+    password,
+    gender,
+    age,
+    phoneNumber,
+    bio,
+    country,
+    state,
+  } = req.body;
   const isUserExists = await userModel.findOne({ email });
   if (isUserExists) {
     return res.status(400).json({ message: "Email is already exists" });
@@ -45,13 +59,21 @@ export const SignUp = async (req, res, next) => {
       .status(500)
       .json({ message: "Please try again later or contact teh support team" });
   }
-  const qrcode = await generateQrCode({ data: user });
+  const qrcode = await generateQrCode({ data: isUserExists });
   const hashedPassword = bcrypt.hashSync(password, +process.env.SALT_ROUNDS);
   const user = new userModel({
+    firstname,
+    lastname,
     username,
     email,
     password: hashedPassword,
     gender,
+    age,
+    QrCode: qrcode,
+    phoneNumber,
+    bio,
+    country,
+    state,
   });
   await user.save();
   res.status(201).json({ message: "Done", user });
@@ -93,20 +115,24 @@ export const SignIn = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
   const isUserExists = await userModel.findOne({ email, isConfirmed: true });
   if (!isUserExists) {
-    return next(new Error("in-valid login credentails ", { cause: 400 }));
+    return next(
+      new Error("email user is not exist or your E-mail is not verified")
+    );
   }
   const passMatch = bcrypt.compareSync(password, isUserExists.password); // true , false
   if (!passMatch) {
-    return next(new Error("in-valid login credentails ", { cause: 400 }));
+    return next(new Error("password invalid login password", { cause: 400 }));
   }
 
   const userToken = generateToken({
     payload: {
       useremail: email,
+      firstname: isUserExists.firstname,
+      username: isUserExists.username,
       _id: isUserExists._id,
     },
     signature: process.env.SIGN_IN_TOKEN_SECRET,
-    expiresIn: "1h",
+    expiresIn: "2h",
   });
 
   if (!userToken) {
@@ -120,38 +146,101 @@ export const SignIn = asyncHandler(async (req, res, next) => {
   await isUserExists.save();
   res.status(200).json({ message: "LoggedIn success", userToken });
 });
+//MARK:FORGOT PASSWORD
+export const forgotPassword = async (req, res, next) => {
+  const { email } = req.body;
+  const user = await userModel.findOne({ email });
+  if (!user) next(new Error("Email not found", { cause: 404 }));
+  const code = nanoid();
+  await userModel.findOneAndUpdate({ email }, { forgetCode: code });
+  const token = generateToken({
+    payload: { email, code },
+    signature: process.env.FORGET_PASSWORD_TOKEN,
+    expiresIn: "1h",
+  });
 
+  const confirmationLink = `${req.protocol}://${req.headers.host}/user/resetPassword/${token}`;
+  const isEmailSent = sendEmailService({
+    to: email,
+    subject: "Forget Password",
+    message: emailTemplate({
+      link: confirmationLink,
+      linkData: "click here to reset your password",
+      subject: "Forget Password",
+    }),
+  });
+
+  if (!isEmailSent) next(new Error("Email not sent", { cause: 500 }));
+
+  res.status(200).json({ message: "Email sent successfully", token });
+};
+//MARK: reset password
+export const resetPassword = async (req, res, next) => {
+  const { token } = req.params;
+  const { newPassword } = req.body;
+  const decode = verifyToken({
+    token,
+    signature: process.env.FORGET_PASSWORD_TOKEN,
+  });
+  const user = await userModel.findOne({
+    email: decode.email,
+    forgetCode: decode.code,
+  });
+  if (!user)
+    next(
+      new Error("you've already reseted your password, try to login", {
+        cause: 404,
+      })
+    );
+  const hashedPassword = bcrypt.hashSync(newPassword, +process.env.SALT_ROUNDS);
+  user.password = hashedPassword;
+  user.forgetCode = null;
+  const updatedUser = await user.save();
+  if (!updatedUser) next(new Error("Password not updated", { cause: 500 }));
+  res.status(200).json({ message: "Password updated successfully" });
+};
 //MARK:UPDATEPROFILE
 export const updateProfile = async (req, res, next) => {
-  const { _id } = req.authUser;
-  const { userId } = req.params;
-  const { username } = req.body;
-
-  const userExists = await userModel.findById(userId);
+  const { username } = req.params;
+  const userExists = await userModel.findOne({ username });
   if (!userExists) {
-    return next(new Error("in-valid userId", { cause: 400 }));
+    return next(new Error("in-valid username", { cause: 400 }));
   }
-
-  if (userExists._id.toString() !== _id) {
+  if (req.body.password) {
+    req.body.password = bcrypt.hashSync(
+      req.body.password,
+      +process.env.SALT_ROUNDS
+    );
+  }
+  if (userExists.username.toString() !== username.toString()) {
     return next(new Error("Unauthorized", { cause: 401 }));
   }
 
-  const user = await userModel.findByIdAndUpdate(
-    { _id: userId },
-    { username },
-    { new: true }
-  );
+  const user = await userModel.findOneAndUpdate({ username }, req.body, {
+    new: true,
+  });
+  if (req.newToken) res.status(201).json({ message: "Done", user });
   res.status(200).json({ message: "Done", user });
 };
 
 //MARK:GET USER
 export const getUser = async (req, res, next) => {
-  const { _id } = req.params;
-  const user = await userModel.findById(_id, "username");
+  const { username } = req.params;
+  const user = await userModel.findOne({ username });
+
   if (!user) {
     return next(new Error("in-valid userId", { cause: 400 }));
   }
-  const qrcode = await generateQrCode({ data: user });
+  console.log(user);
+  const qrcode = await generateQrCode({
+    data: [
+      user.username,
+      user.age,
+      user.phoneNumber,
+      user.profile_pic.secure_url,
+    ],
+  });
+  if (req.newToken) res.status(201).json({ message: "Done", user, qrcode });
   res.status(200).json({ message: "Done", user, qrcode });
 };
 
@@ -162,6 +251,7 @@ export const profilePicture = async (req, res, next) => {
   if (!req.file) {
     return next(new Error("please upload profile picture", { cause: 400 }));
   }
+  await cloudinary.api.delete_resources_by_prefix(`Users/profiles/${_id}`);
   const { secure_url, public_id } = await cloudinary.uploader.upload(
     req.file.path,
     {
@@ -184,7 +274,8 @@ export const profilePicture = async (req, res, next) => {
     await cloudinary.uploader.destroy(public_id);
     return next(new Error("please try again later", { cause: 400 }));
   }
-  res.status(200).json({ message: "Done", user });
+  if (req.newToken) res.status(201).json({ message: "Done", user });
+  else res.status(200).json({ message: "Done", user });
 };
 //MARK: COVER PICTURES
 export const coverPictures = async (req, res, next) => {
@@ -221,5 +312,59 @@ export const coverPictures = async (req, res, next) => {
       new: true,
     }
   );
+  if (req.newToken) res.status(201).json({ message: "Done", user });
+  res.status(200).json({ message: "Done", userNew });
+};
+//MARK:GET ALL USERS
+export const getAllUsers = async (req, res, next) => {
+  const users = await userModel.find({});
+  res.status(200).json({ message: "Done", users });
+};
+export const searchUser = async (req, res, next) => {
+  const { username } = req.query;
+  const users = await userModel
+    .find({ username: { $regex: username, $options: "i" } })
+    .limit(20)
+    .skip(0)
+    .select("username -_id");
+  res.status(200).json({ message: "Done", users });
+};
+//MARK:DECODE TOKEN
+export const decodeToken = async (req, res, next) => {
+  const { _id } = req.authUser;
+  const data = await userModel.findById(_id);
+  if (!data) return next(new Error("user not found", { cause: 404 }));
+  if (req.newToken) res.status(201).json({ message: "done", data });
+  res.status(200).json({ message: "done", data });
+};
+//MARK:DELETE COVER PICTURE
+export const deleteCoverPicture = async (req, res, next) => {
+  const { _id } = req.authUser;
+  const { secure_url } = req.body;
+  console.log(req.body);
+  const user = await userModel.findById(_id);
+  let public_id;
+  if (!user) return next(new Error("user not found", { cause: 404 }));
+  for (const cover of user.coverPictures) {
+    console.log(cover.secure_url, secure_url);
+    if (cover.secure_url === secure_url) {
+      public_id = cover.public_id;
+      console.log("here");
+      await cloudinary.uploader.destroy([cover.public_id]);
+    }
+  }
+  const coverPictures = user.coverPictures.filter(
+    (cover) => cover.public_id !== public_id
+  );
+  const userNew = await userModel.findByIdAndUpdate(
+    _id,
+    {
+      coverPictures,
+    },
+    {
+      new: true,
+    }
+  );
+  if (req.newToken) res.status(201).json({ message: "Done", user });
   res.status(200).json({ message: "Done", userNew });
 };

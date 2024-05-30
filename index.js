@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-
+import cors from "cors";
 import { config } from "dotenv";
 config({ path: path.resolve("./config/config.env") });
 
@@ -14,6 +14,12 @@ app.use(express.json());
 connectionDB();
 
 app.get("/", (req, res) => res.send("Hello World!"));
+const corsOptions = {
+  origin: "http://localhost:3000",
+  credentials: true, //access-control-allow-credentials:true
+  optionSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 app.use("/uploads", express.static("./uploads"));
 
 app.use("/user", allRouter.userRouter);

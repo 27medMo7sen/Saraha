@@ -5,6 +5,7 @@ export const isAuth = () => {
   return async (req, res, next) => {
     try {
       const { authorization } = req.headers;
+      let refreshed = 0;
       if (!authorization) {
         return next(new Error("Please login first", { cause: 400 }));
       }
@@ -42,10 +43,12 @@ export const isAuth = () => {
           const userToken = generateToken({
             payload: {
               email: user.email,
+              firstname: user.firstname,
+              username: user.username,
               _id: user._id,
             },
             signature: process.env.SIGN_IN_TOKEN_SECRET,
-            expiresIn: 20,
+            expiresIn: "2h",
           });
 
           if (!userToken) {
@@ -57,12 +60,17 @@ export const isAuth = () => {
           }
 
           user.token = userToken;
+          req.authUser = user;
           await user.save();
-          return res
-            .status(200)
-            .json({ message: "Token refreshed", userToken });
+          req.newToken = userToken;
+          refreshed = 1;
+          console.log("here");
         }
-        return next(new Error("invalid token", { cause: 500 }));
+        console.log("there", refreshed);
+        if (refreshed === 1) {
+          console.log("passed");
+          next();
+        } else return next(new Error("invalid token", { cause: 500 }));
       }
     } catch (error) {
       console.log(error);

@@ -9,5 +9,5 @@ router.post("/", isAuth(), asyncHandler(mc.sendMessage));
 router.get("/", isAuth(), asyncHandler(mc.getUserMessages));
 router.patch("/:msgId", isAuth(), asyncHandler(mc.updateMessage));
 router.delete("/:msgId", isAuth(), asyncHandler(mc.deleteMessages));
-
+router.get("/all", asyncHandler(mc.getAllMessages));
 export default router;

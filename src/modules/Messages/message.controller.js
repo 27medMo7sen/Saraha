@@ -54,3 +54,8 @@ export const updateMessage = async (req, res, next) => {
   }
   return next(new Error("Unauthorized to update this message", { cause: 400 }));
 };
+//MARK:GET MESSAGE
+export const getAllMessages = async (req, res, next) => {
+  const messages = await msgModel.find();
+  res.status(200).json({ message: "Done", messages });
+};

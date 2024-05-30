@@ -2,6 +2,14 @@ import mongoose, { Schema } from "mongoose";
 
 const userSchema = new Schema(
   {
+    firstname: {
+      type: String,
+      required: true,
+    },
+    lastname: {
+      type: String,
+      required: true,
+    },
     username: {
       type: String,
       required: true,
@@ -37,8 +45,23 @@ const userSchema = new Schema(
     },
     age: {
       type: Number,
-      min: 18,
-      max: 100,
+    },
+    phoneNumber: {
+      type: String,
+      required: false,
+    },
+    country: {
+      type: String,
+      required: false,
+    },
+    bio: {
+      type: String,
+      default: "Hi, I'm using Saraha App!",
+      required: false,
+    },
+    state: {
+      type: String,
+      required: false,
     },
     QrCode: {
       type: String,
@@ -46,6 +69,16 @@ const userSchema = new Schema(
     token: {
       type: String,
     },
+    forgetCode: {
+      type: String,
+    },
+    flowers: Number,
+    following: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   {
     timestamps: true,
