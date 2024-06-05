@@ -8,6 +8,7 @@ import cloudinary from "../../utils/coludinaryConfigrations.js";
 import { generateQrCode } from "../../utils/qrCodeFunction.js";
 import { generateToken, verifyToken } from "../../utils/tokenFunctions.js";
 import { emailTemplate } from "../../utils/emailTemplate.js";
+import { chatModel } from "../../../DB/Models/chat.model.js";
 
 //MARK:SIGNUP
 export const SignUp = async (req, res, next) => {
@@ -137,14 +138,21 @@ export const SignIn = asyncHandler(async (req, res, next) => {
 
   if (!userToken) {
     return next(
-      new Error("token generation fail, payload canot be empty", {
+      new Error("token generation fail, payload cannot be empty", {
         cause: 400,
       })
     );
   }
   isUserExists.token = userToken;
   await isUserExists.save();
-  res.status(200).json({ message: "LoggedIn success", userToken });
+  await res.cookie("userToken", userToken, {
+    // httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 2,
+    path: "/",
+    sameSite: "Lax",
+  });
+
+  res.status(200).json({ message: "LoggedIn success" });
 });
 //MARK:FORGOT PASSWORD
 export const forgotPassword = async (req, res, next) => {
@@ -219,7 +227,6 @@ export const updateProfile = async (req, res, next) => {
   const user = await userModel.findOneAndUpdate({ username }, req.body, {
     new: true,
   });
-  if (req.newToken) res.status(201).json({ message: "Done", user });
   res.status(200).json({ message: "Done", user });
 };
 
@@ -240,7 +247,6 @@ export const getUser = async (req, res, next) => {
       user.profile_pic.secure_url,
     ],
   });
-  if (req.newToken) res.status(201).json({ message: "Done", user, qrcode });
   res.status(200).json({ message: "Done", user, qrcode });
 };
 
@@ -273,9 +279,7 @@ export const profilePicture = async (req, res, next) => {
   if (!user) {
     await cloudinary.uploader.destroy(public_id);
     return next(new Error("please try again later", { cause: 400 }));
-  }
-  if (req.newToken) res.status(201).json({ message: "Done", user });
-  else res.status(200).json({ message: "Done", user });
+  } else res.status(200).json({ message: "Done", user });
 };
 //MARK: COVER PICTURES
 export const coverPictures = async (req, res, next) => {
@@ -312,7 +316,6 @@ export const coverPictures = async (req, res, next) => {
       new: true,
     }
   );
-  if (req.newToken) res.status(201).json({ message: "Done", user });
   res.status(200).json({ message: "Done", userNew });
 };
 //MARK:GET ALL USERS
@@ -333,8 +336,8 @@ export const searchUser = async (req, res, next) => {
 export const decodeToken = async (req, res, next) => {
   const { _id } = req.authUser;
   const data = await userModel.findById(_id);
+  console.log(data);
   if (!data) return next(new Error("user not found", { cause: 404 }));
-  if (req.newToken) res.status(201).json({ message: "done", data });
   res.status(200).json({ message: "done", data });
 };
 //MARK:DELETE COVER PICTURE
@@ -365,6 +368,46 @@ export const deleteCoverPicture = async (req, res, next) => {
       new: true,
     }
   );
-  if (req.newToken) res.status(201).json({ message: "Done", user });
   res.status(200).json({ message: "Done", userNew });
+};
+//MARK: GET ALL ANONYMUOS CHATS
+export const getAnonymousChats = async (req, res, next) => {
+  const { _id } = req.authUser;
+  const chats = await chatModel
+    .find({
+      receiver: _id,
+      merged: false,
+    })
+    .select("updatedAt _id");
+  res.status(200).json({ message: "Done", chats });
+};
+//MARK: GET PUBLIC CHATS
+export const getPublicChats = async (req, res, next) => {
+  const { _id } = req.authUser;
+  console.log(_id);
+  console.log("u here");
+  const chats = await chatModel
+    .find({
+      $or: [{ merged: true }, { starter: _id }],
+    })
+    .populate("starter receiver");
+  let ret = [];
+  for (const chat of chats) {
+    let appendList = {};
+    if (chat.starter._id.toString() === _id.toString()) {
+      appendList.username = chat.receiver.username;
+      appendList.firstname = chat.receiver.firstname;
+      appendList.lastname = chat.receiver.lastname;
+      appendList.profilePicture = chat.receiver.profile_pic.secure_url || "";
+      appendList.chatId = chat._id;
+    } else {
+      appendList.username = chat.starter.username;
+      appendList.firstname = chat.starter.firstname;
+      appendList.lastname = chat.starter.lastname;
+      appendList.profilePicture = chat.starter.profile_pic.secure_url || "";
+      appendList.chatId = chat._id;
+    }
+    ret.push(appendList);
+  }
+  res.status(200).json({ message: "Done", ret });
 };

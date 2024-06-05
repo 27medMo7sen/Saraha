@@ -4,6 +4,7 @@ import { generateToken, verifyToken } from "../utils/tokenFunctions.js";
 export const isAuth = () => {
   return async (req, res, next) => {
     try {
+      console.log("auth middleware");
       const { authorization } = req.headers;
       let refreshed = 0;
       if (!authorization) {
@@ -58,12 +59,16 @@ export const isAuth = () => {
               })
             );
           }
-
           user.token = userToken;
           req.authUser = user;
           await user.save();
-          req.newToken = userToken;
           refreshed = 1;
+          res.cookie("userToken", userToken, {
+            // httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 2,
+            path: "/",
+            sameSite: "Lax",
+          });
           console.log("here");
         }
         console.log("there", refreshed);

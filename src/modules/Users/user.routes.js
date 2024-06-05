@@ -9,6 +9,8 @@ import { SignUpSchema, UpdateProfileSchema } from "./user.validationSchemas.js";
 import { multerCloudFunction } from "../../services/multerCloud.js";
 import { allowedExtensions } from "../../utils/allowedExtensions.js";
 
+router.get("/privateChats", isAuth(), asyncHandler(uc.getAnonymousChats));
+router.get("/publicChats", isAuth(), asyncHandler(uc.getPublicChats));
 router.post("/", validationCoreFunction(SignUpSchema), asyncHandler(uc.SignUp));
 router.get("/confirmEmail/:token", asyncHandler(uc.confirmEmail));
 router.get("/search", asyncHandler(uc.searchUser));
@@ -31,7 +33,6 @@ router.post(
   multerCloudFunction(allowedExtensions.Image).single("profile"),
   asyncHandler(uc.profilePicture)
 );
-
 router.post(
   "/coverPics",
   isAuth(),
