@@ -3,7 +3,12 @@ import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { config } from "dotenv";
-import { ioGeneration, getIo } from "./src/utils/ioGeneration.js";
+import {
+  ioGeneration,
+  getIo,
+  usersSocket,
+  setIsRead,
+} from "./src/utils/ioGeneration.js";
 config({ path: path.resolve("./config/config.env") });
 
 const app = express();
@@ -27,7 +32,6 @@ app.use("/uploads", express.static("./uploads"));
 
 app.use("/user", allRouter.userRouter);
 app.use("/chat", allRouter.chatRouter);
-
 app.all("*", (req, res, next) =>
   res.status(404).json({ message: "404 Not Found URL" })
 );
@@ -42,5 +46,16 @@ const serverApp = app.listen(port, () =>
 );
 const io = ioGeneration(serverApp, "http://localhost:3000");
 getIo().on("connection", (socket) => {
-  console.log("user is connected ", socket.id);
+  socket.on("join", (data) => {
+    console.log(data);
+    usersSocket[data.userId] = socket.id;
+    console.log("user joined", usersSocket[data.userId]);
+  });
+  socket.on("iAmHere", () => {
+    console.log("i'm fucking here");
+    setIsRead(true);
+  });
+  socket.on("disconnect", () => {
+    console.log("user is disconnected ", socket.id);
+  });
 });
