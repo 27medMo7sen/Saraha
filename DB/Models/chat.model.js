@@ -3,29 +3,41 @@ import mongoose, { Schema } from "mongoose";
 const chatSchema = new Schema(
   {
     starter: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
     },
     receiver: {
+      type: String,
+      required: true,
+    },
+    starterId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+    },
+    receiverId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
     messages: [
       {
         sender: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
+          type: String,
           required: true,
         },
         message: {
           type: String,
           required: true,
         },
+        read: {
+          type: Boolean,
+          default: false,
+        },
         sentAt: {
           type: Date,
-          default: Date.now,
+          default: () =>
+            new Date(
+              new Date().getTime() - new Date().getTimezoneOffset() * 60000
+            ),
         },
       },
     ],
@@ -37,7 +49,6 @@ const chatSchema = new Schema(
       type: String,
     },
   },
-
   {
     timestamps: true,
   }

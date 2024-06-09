@@ -79,6 +79,9 @@ const userSchema = new Schema(
         ref: "User",
       },
     ],
+    userId: {
+      type: String,
+    },
   },
   {
     timestamps: true,
