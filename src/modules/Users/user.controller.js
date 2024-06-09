@@ -2,7 +2,7 @@ import { userModel } from "../../../DB/Models/user.model.js";
 import bcrypt from "bcrypt";
 import { asyncHandler } from "../../utils/errorhandling.js";
 import { customAlphabet } from "nanoid";
-const nanoid = customAlphabet("123456_=!ascbhdtel", 5);
+const nanoid = customAlphabet("123456_=!ascbhdtel", 10);
 import { sendEmailService } from "../../services/sendEmailService.js";
 import cloudinary from "../../utils/coludinaryConfigrations.js";
 import { generateQrCode } from "../../utils/qrCodeFunction.js";
@@ -29,7 +29,7 @@ export const SignUp = async (req, res, next) => {
   if (isUserExists) {
     return res.status(400).json({ message: "Email is already exists" });
   }
-
+  const userId = nanoid();
   const token = generateToken({
     payload: {
       email,
@@ -73,6 +73,7 @@ export const SignUp = async (req, res, next) => {
     QrCode: qrcode,
     phoneNumber,
     bio,
+    userId,
     country,
     state,
   });
@@ -147,12 +148,12 @@ export const SignIn = asyncHandler(async (req, res, next) => {
   await isUserExists.save();
   await res.cookie("userToken", userToken, {
     // httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 2,
+    maxAge: 1000 * 60 * 60 * 48,
     path: "/",
     sameSite: "Lax",
   });
 
-  res.status(200).json({ message: "LoggedIn success" });
+  res.status(200).json({ message: "LoggedIn success", user: isUserExists });
 });
 //MARK:FORGOT PASSWORD
 export const forgotPassword = async (req, res, next) => {
@@ -209,10 +210,11 @@ export const resetPassword = async (req, res, next) => {
 };
 //MARK:UPDATEPROFILE
 export const updateProfile = async (req, res, next) => {
-  const { username } = req.params;
-  const userExists = await userModel.findOne({ username });
+  const { userId } = req.params;
+  console.log(userId);
+  const userExists = await userModel.findOne({ userId });
   if (!userExists) {
-    return next(new Error("in-valid username", { cause: 400 }));
+    return next(new Error("there is no such user", { cause: 400 }));
   }
   if (req.body.password) {
     req.body.password = bcrypt.hashSync(
@@ -220,11 +222,7 @@ export const updateProfile = async (req, res, next) => {
       +process.env.SALT_ROUNDS
     );
   }
-  if (userExists.username.toString() !== username.toString()) {
-    return next(new Error("Unauthorized", { cause: 401 }));
-  }
-
-  const user = await userModel.findOneAndUpdate({ username }, req.body, {
+  const user = await userModel.findOneAndUpdate({ userId }, req.body, {
     new: true,
   });
   res.status(200).json({ message: "Done", user });
@@ -232,8 +230,9 @@ export const updateProfile = async (req, res, next) => {
 
 //MARK:GET USER
 export const getUser = async (req, res, next) => {
-  const { username } = req.params;
-  const user = await userModel.findOne({ username });
+  const { userId } = req.params;
+  console.log(userId);
+  const user = await userModel.findOne({ userId });
 
   if (!user) {
     return next(new Error("in-valid userId", { cause: 400 }));
@@ -329,14 +328,13 @@ export const searchUser = async (req, res, next) => {
     .find({ username: { $regex: username, $options: "i" } })
     .limit(20)
     .skip(0)
-    .select("username -_id");
+    .select("userId username -_id");
   res.status(200).json({ message: "Done", users });
 };
 //MARK:DECODE TOKEN
 export const decodeToken = async (req, res, next) => {
   const { _id } = req.authUser;
   const data = await userModel.findById(_id);
-  console.log(data);
   if (!data) return next(new Error("user not found", { cause: 404 }));
   res.status(200).json({ message: "done", data });
 };
@@ -372,41 +370,56 @@ export const deleteCoverPicture = async (req, res, next) => {
 };
 //MARK: GET ALL ANONYMUOS CHATS
 export const getAnonymousChats = async (req, res, next) => {
-  const { _id } = req.authUser;
+  const { userId } = req.authUser;
+  // console.log(req.authUser);
+  // console.log(userId);
   const chats = await chatModel
     .find({
-      receiver: _id,
+      receiver: userId,
       merged: false,
     })
-    .select("updatedAt _id");
+    .sort({ updatedAt: -1 })
+    .select("updatedAt starter  _id");
   res.status(200).json({ message: "Done", chats });
 };
 //MARK: GET PUBLIC CHATS
 export const getPublicChats = async (req, res, next) => {
-  const { _id } = req.authUser;
-  console.log(_id);
-  console.log("u here");
+  const { userId } = req.authUser;
   const chats = await chatModel
     .find({
-      $or: [{ merged: true }, { starter: _id }],
+      $or: [{ merged: true }, { starter: userId }],
     })
-    .populate("starter receiver");
+    .sort({ updatedAt: -1 })
+    .populate("starterId receiverId");
   let ret = [];
   for (const chat of chats) {
     let appendList = {};
-    if (chat.starter._id.toString() === _id.toString()) {
-      appendList.username = chat.receiver.username;
-      appendList.firstname = chat.receiver.firstname;
-      appendList.lastname = chat.receiver.lastname;
-      appendList.profilePicture = chat.receiver.profile_pic.secure_url || "";
-      appendList.chatId = chat._id;
+    if (chat.starter.toString() === userId.toString()) {
+      appendList.userId = chat.receiverId.userId;
+      appendList.firstname = chat.receiverId.firstname;
+      appendList.lastname = chat.receiverId.lastname;
+      appendList.profilePicture = chat.receiverId.profile_pic.secure_url
+        ? chat.receiverId.profile_pic.secure_url
+        : "";
+      appendList.updatedAt = chat.updatedAt;
     } else {
-      appendList.username = chat.starter.username;
-      appendList.firstname = chat.starter.firstname;
-      appendList.lastname = chat.starter.lastname;
-      appendList.profilePicture = chat.starter.profile_pic.secure_url || "";
-      appendList.chatId = chat._id;
+      appendList.userId = chat.starterId.userId;
+      appendList.firstname = chat.starterId.firstname;
+      appendList.lastname = chat.starterId.lastname;
+      appendList.profilePicture = chat.starterId.profile_pic.secure_url
+        ? chat.starterId.profile_pic.secure_url
+        : "";
+      appendList.updatedAt = chat.updatedAt;
     }
+    appendList.lastMessage = `${
+      chat.messages[chat.messages.length - 1].sender == userId ? "you: " : ""
+    }${chat.messages[chat.messages.length - 1].message}`;
+    let unread = 0;
+    for (const message of chat.messages) {
+      if (message.sender.toString() !== userId.toString() && !message.read)
+        unread++;
+    }
+    appendList.unread = unread;
     ret.push(appendList);
   }
   res.status(200).json({ message: "Done", ret });

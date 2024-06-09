@@ -16,17 +16,16 @@ router.get("/confirmEmail/:token", asyncHandler(uc.confirmEmail));
 router.get("/search", asyncHandler(uc.searchUser));
 router.post("/login", uc.SignIn);
 router.put(
-  "/:username",
+  "/:userId",
   validationCoreFunction(UpdateProfileSchema),
   isAuth(),
   asyncHandler(uc.updateProfile)
 );
 router.delete("/deleteCover", isAuth(), asyncHandler(uc.deleteCoverPicture));
 router.get("/decodeToken", isAuth(), asyncHandler(uc.decodeToken));
-router.get("/ALL", asyncHandler(uc.getAllUsers));
 router.get("/forgotPassword", asyncHandler(uc.forgotPassword));
 router.patch("/resetPassword/:token", asyncHandler(uc.resetPassword));
-router.get("/:username", asyncHandler(uc.getUser));
+router.get("/:userId", asyncHandler(uc.getUser));
 router.post(
   "/profilePic",
   isAuth(),
