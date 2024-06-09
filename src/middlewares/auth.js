@@ -25,7 +25,7 @@ export const isAuth = () => {
 
         const findUser = await userModel.findById(
           decodedData._id,
-          "email username"
+          "email username userId"
         );
         if (!findUser) {
           return next(new Error("Please SignUp", { cause: 400 }));
@@ -65,7 +65,7 @@ export const isAuth = () => {
           refreshed = 1;
           res.cookie("userToken", userToken, {
             // httpOnly: true,
-            maxAge: 1000 * 60 * 60 * 2,
+            maxAge: 1000 * 60 * 60 * 48,
             path: "/",
             sameSite: "Lax",
           });
