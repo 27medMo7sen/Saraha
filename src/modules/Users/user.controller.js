@@ -152,7 +152,12 @@ export const SignIn = asyncHandler(async (req, res, next) => {
     path: "/",
     sameSite: "Lax",
   });
-
+  await res.cookie("userId", isUserExists.userId, {
+    // httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 48,
+    path: "/",
+    sameSite: "Lax",
+  });
   res.status(200).json({ message: "LoggedIn success", user: isUserExists });
 });
 //MARK:FORGOT PASSWORD
@@ -371,17 +376,46 @@ export const deleteCoverPicture = async (req, res, next) => {
 //MARK: GET ALL ANONYMUOS CHATS
 export const getAnonymousChats = async (req, res, next) => {
   const { userId } = req.authUser;
-  // console.log(req.authUser);
-  // console.log(userId);
   const chats = await chatModel
     .find({
       receiver: userId,
       merged: false,
     })
     .sort({ updatedAt: -1 })
-    .select("updatedAt starter  _id");
-  res.status(200).json({ message: "Done", chats });
+    .populate("starterId receiverId");
+
+  let ret = [];
+
+  for (const chat of chats) {
+    const appendList = {};
+    appendList.userId = chat.starterId.userId;
+    appendList.firstname = chat.starterId.firstname;
+    appendList.lastname = chat.starterId.lastname;
+    appendList.profilePicture = chat.starterId.profile_pic.secure_url || "";
+
+    const lastMessage = chat.messages[chat.messages.length - 1];
+    if (lastMessage) {
+      appendList.updatedAt = lastMessage.sentAt; // Ensure date formatting
+      appendList.lastMessage = `${lastMessage.sender == userId ? "you: " : ""}${
+        lastMessage.message
+      }`;
+
+      let unread = 0; // Initialize unread counter inside the loop
+      for (const message of chat.messages) {
+        if (message.sender.toString() !== userId.toString() && !message.read)
+          unread++;
+      }
+      appendList.unread = unread;
+
+      ret.push(appendList);
+    } else {
+      console.error("No messages found for chat:", chat);
+    }
+  }
+
+  res.status(200).json({ message: "Done", ret });
 };
+
 //MARK: GET PUBLIC CHATS
 export const getPublicChats = async (req, res, next) => {
   const { userId } = req.authUser;
@@ -401,7 +435,7 @@ export const getPublicChats = async (req, res, next) => {
       appendList.profilePicture = chat.receiverId.profile_pic.secure_url
         ? chat.receiverId.profile_pic.secure_url
         : "";
-      appendList.updatedAt = chat.updatedAt;
+      appendList.updatedAt = chat.messages[chat.messages.length - 1].sentAt;
     } else {
       appendList.userId = chat.starterId.userId;
       appendList.firstname = chat.starterId.firstname;
@@ -409,7 +443,7 @@ export const getPublicChats = async (req, res, next) => {
       appendList.profilePicture = chat.starterId.profile_pic.secure_url
         ? chat.starterId.profile_pic.secure_url
         : "";
-      appendList.updatedAt = chat.updatedAt;
+      appendList.updatedAt = chat.messages[chat.messages.length - 1].sentAt;
     }
     appendList.lastMessage = `${
       chat.messages[chat.messages.length - 1].sender == userId ? "you: " : ""

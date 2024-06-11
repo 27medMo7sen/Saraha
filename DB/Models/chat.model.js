@@ -24,6 +24,10 @@ const chatSchema = new Schema(
           type: String,
           required: true,
         },
+        receiver: {
+          type: String,
+          required: true,
+        },
         message: {
           type: String,
           required: true,
@@ -44,9 +48,6 @@ const chatSchema = new Schema(
     merged: {
       type: Boolean,
       default: false,
-    },
-    token: {
-      type: String,
     },
   },
   {

@@ -17,51 +17,86 @@ export const sendMessageToPublic = async (req, res, next) => {
   const chat = await chatModel.findOne({
     $or: [{ starter: userId, receiver: sendTo }, { merged: true }],
   });
-  if (!chat) {
-    console.log("chat not found");
-    const newChat = new chatModel({
-      starter: userId,
-      receiver: sendTo,
-      starterId: _id,
-      receiverId: user._id,
-      messages: [{ sender: userId, message: content }],
-    });
-    await newChat.save();
+  getIo().to(usersSocket[sendTo]).emit("areYouHere", { userId });
+  setTimeout(async () => {
+    console.log(getIsRead(), "is read");
+    if (!chat) {
+      console.log("chat not found");
+      const newChat = new chatModel({
+        starter: userId,
+        receiver: sendTo,
+        starterId: _id,
+        receiverId: user._id,
+        messages: [
+          {
+            sender: userId,
+            receiver: sendTo,
+            message: content,
+            read: getIsRead(),
+          },
+        ],
+      });
+      await newChat.save();
+      getIo()
+        .to(usersSocket[userId])
+        .emit("chatMessage", {
+          message: content,
+          sender: userId,
+          receiver: sendTo,
+          sentAt: new Date(
+            new Date().getTime() - new Date().getTimezoneOffset() * 60000
+          ),
+        });
+      getIo()
+        .to(usersSocket[sendTo])
+        .emit("chatMessage", {
+          message: content,
+          sender: userId,
+          receiver: sendTo,
+          sentAt: new Date(
+            new Date().getTime() - new Date().getTimezoneOffset() * 60000
+          ),
+        });
+      return res.status(200).json({ message: "Done", newChat });
+    }
     getIo()
       .to(usersSocket[userId])
       .emit("chatMessage", {
         message: content,
         sender: userId,
-        sentAt: newChat.messages[newChat.messages.length - 1].sentAt,
+        receiver: sendTo,
+        sentAt: new Date(
+          new Date().getTime() - new Date().getTimezoneOffset() * 60000
+        ),
       });
     getIo()
       .to(usersSocket[sendTo])
       .emit("chatMessage", {
         message: content,
         sender: userId,
-        sentAt: newChat.messages[newChat.messages.length - 1].sentAt,
+        receiver: sendTo,
+        sentAt: new Date(
+          new Date().getTime() - new Date().getTimezoneOffset() * 60000
+        ),
       });
-    return res.status(200).json({ message: "Done", newChat });
-  }
-  // console.log(userId, sendTo, "all i have");
-  // console.log(usersSocket[userId], usersSocket[sendTo], "all i have2");
-  getIo()
-    .to(usersSocket[userId])
-    .emit("chatMessage", {
-      message: content,
+    getIo()
+      .to(usersSocket[sendTo])
+      .emit("updateAnonymousChats", {
+        userId: userId,
+        lastMessage: `${chat.messages[chat.messages.length - 1].message} `,
+        updatedAt:new Date(
+          new Date().getTime() - new Date().getTimezoneOffset() * 60000
+        ),
+      });
+    chat.messages.push({
       sender: userId,
-      sentAt: chat.messages[chat.messages.length - 1].sentAt,
-    });
-  getIo()
-    .to(usersSocket[sendTo])
-    .emit("chatMessage", {
+      receiver: sendTo,
       message: content,
-      sender: userId,
-      sentAt: chat.messages[chat.messages.length - 1].sentAt,
+      read: getIsRead(),
     });
-  chat.messages.push({ sender: userId, message: content });
-  await chat.save();
-  return res.status(200).json({ message: "Done", chat });
+    await chat.save();
+    return res.status(200).json({ message: "Done", chat });
+  }, 5);
 };
 //MARK: SEND MESSAGE TO PRIVATE
 export const sendMessageToPrivate = async (req, res, next) => {
@@ -79,17 +114,23 @@ export const sendMessageToPrivate = async (req, res, next) => {
   const socket = getIo();
 
   if (usersSocket[userIdS]) {
-    socket.to(usersSocket[userIdS]).emit("areYouHere");
+    socket.to(usersSocket[userIdS]).emit("areYouHere", { userId });
   }
   setTimeout(async () => {
     console.log(getIsRead(), "is read");
-    chat.messages.push({ sender: userId, message: content, read: getIsRead() });
+    chat.messages.push({
+      sender: userId,
+      receiver: userIdS,
+      message: content,
+      read: getIsRead(),
+    });
     await chat.save();
     getIo()
       .to(usersSocket[userIdS])
       .emit("chatMessage", {
         message: content,
         sender: userId,
+        receiver: userIdS,
         sentAt: chat.messages[chat.messages.length - 1].sentAt,
       });
     getIo()
@@ -97,6 +138,7 @@ export const sendMessageToPrivate = async (req, res, next) => {
       .emit("chatMessage", {
         message: content,
         sender: userId,
+        receiver: userIdS,
         sentAt: chat.messages[chat.messages.length - 1].sentAt,
       });
     getIo()
@@ -104,7 +146,7 @@ export const sendMessageToPrivate = async (req, res, next) => {
       .emit("updatePublicChats", {
         userId: userId,
         lastMessage: `${chat.messages[chat.messages.length - 1].message} `,
-        updatedAt: chat.updatedAt,
+        updatedAt: chat.messages[chat.messages.length - 1].sentAt,
       });
     setIsRead(false);
     return res.status(200).json({ message: "Done", chat });
@@ -121,6 +163,14 @@ export const getChat = async (req, res, next) => {
     merged: false,
   });
   console.log(chat);
+  for (let i = 0; i < chat.messages.length; i++) {
+    if (chat.messages[i].sender.toString() !== userId.toString()) {
+      chat.messages[i].read = true;
+      console.log(chat.messages[i].sender, userId);
+    }
+  }
+  await chat.save();
+
   return res.status(200).json({ message: "Done", chat });
 };
 //MARK:GET PUBLIC CHAT

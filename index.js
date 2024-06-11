@@ -47,7 +47,7 @@ const serverApp = app.listen(port, () =>
 const io = ioGeneration(serverApp, "http://localhost:3000");
 getIo().on("connection", (socket) => {
   socket.on("join", (data) => {
-    console.log(data);
+    // console.log(data);
     usersSocket[data.userId] = socket.id;
     console.log("user joined", usersSocket[data.userId]);
   });
