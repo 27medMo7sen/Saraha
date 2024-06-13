@@ -43,6 +43,11 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    anonymousname: {
+      type: String,
+      unique: true,
+      required: true,
+    },
     age: {
       type: Number,
     },
