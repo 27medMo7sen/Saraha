@@ -6,6 +6,7 @@ export const isAuth = () => {
     try {
       console.log("auth middleware");
       const { authorization } = req.headers;
+      console.log(req.headers);
       let refreshed = 0;
       if (!authorization) {
         return next(new Error("Please login first", { cause: 400 }));
