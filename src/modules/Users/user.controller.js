@@ -9,7 +9,6 @@ import { generateQrCode } from "../../utils/qrCodeFunction.js";
 import { generateToken, verifyToken } from "../../utils/tokenFunctions.js";
 import { emailTemplate } from "../../utils/emailTemplate.js";
 import { chatModel } from "../../../DB/Models/chat.model.js";
-
 //MARK:SIGNUP
 export const SignUp = async (req, res, next) => {
   const {
@@ -21,6 +20,7 @@ export const SignUp = async (req, res, next) => {
     gender,
     age,
     phoneNumber,
+    anonymousname,
     bio,
     country,
     state,
@@ -28,6 +28,14 @@ export const SignUp = async (req, res, next) => {
   const isUserExists = await userModel.findOne({ email });
   if (isUserExists) {
     return res.status(400).json({ message: "Email is already exists" });
+  }
+  const anon = await userModel.findOne({ anonymousname });
+  if (anon) {
+    return res.status(400).json({ message: "anonymousname is already exists" });
+  }
+  const User = await userModel.findOne({ username });
+  if (User) {
+    return res.status(400).json({ message: "username is already exists" });
   }
   const userId = nanoid();
   const token = generateToken({
@@ -46,14 +54,16 @@ export const SignUp = async (req, res, next) => {
     );
   }
 
-  const confirmLink = `${req.protocol}://${req.headers.host}/user/confirmEmail/${token}`;
-
-  const message = `<a href=${confirmLink}> Click to confirm your email </a>`;
+  const confirmLink = `http://localhost:3000/${token}`;
 
   const isEmailSent = await sendEmailService({
-    message,
     to: email,
-    subject: "Confiramtion Email",
+    subject: "Confirm Email",
+    message: emailTemplate({
+      link: confirmLink,
+      linkData: "click here to confirm your email",
+      subject: "Email Confirmation",
+    }),
   });
   if (!isEmailSent) {
     return res
@@ -70,6 +80,7 @@ export const SignUp = async (req, res, next) => {
     password: hashedPassword,
     gender,
     age,
+    anonymousname,
     QrCode: qrcode,
     phoneNumber,
     bio,
@@ -262,6 +273,7 @@ export const profilePicture = async (req, res, next) => {
     return next(new Error("please upload profile picture", { cause: 400 }));
   }
   await cloudinary.api.delete_resources_by_prefix(`Users/profiles/${_id}`);
+  console.log("111111111");
   const { secure_url, public_id } = await cloudinary.uploader.upload(
     req.file.path,
     {
@@ -457,4 +469,10 @@ export const getPublicChats = async (req, res, next) => {
     ret.push(appendList);
   }
   res.status(200).json({ message: "Done", ret });
+};
+export const logout = async (req, res, next) => {
+  const { _id } = req.authUser;
+  const user = await userModel.findByIdAndUpdate(_id, { token: "" });
+  if (!user) return next(new Error("user not found", { cause: 404 }));
+  res.status(200).json({ message: "Done" });
 };

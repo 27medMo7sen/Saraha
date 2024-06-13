@@ -12,7 +12,7 @@ import { allowedExtensions } from "../../utils/allowedExtensions.js";
 router.get("/privateChats", isAuth(), asyncHandler(uc.getAnonymousChats));
 router.get("/publicChats", isAuth(), asyncHandler(uc.getPublicChats));
 router.post("/", validationCoreFunction(SignUpSchema), asyncHandler(uc.SignUp));
-router.get("/confirmEmail/:token", asyncHandler(uc.confirmEmail));
+router.post("/confirmEmail/:token", asyncHandler(uc.confirmEmail));
 router.get("/search", asyncHandler(uc.searchUser));
 router.post("/login", uc.SignIn);
 router.put(
@@ -21,6 +21,7 @@ router.put(
   isAuth(),
   asyncHandler(uc.updateProfile)
 );
+router.patch("/logout", isAuth(), asyncHandler(uc.logout));
 router.delete("/deleteCover", isAuth(), asyncHandler(uc.deleteCoverPicture));
 router.get("/decodeToken", isAuth(), asyncHandler(uc.decodeToken));
 router.get("/forgotPassword", asyncHandler(uc.forgotPassword));
